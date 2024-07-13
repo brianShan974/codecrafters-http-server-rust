@@ -20,6 +20,7 @@ fn handle_connection(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
     } else {
         successful_response
     };
+    // println!("{}", String::from_utf8_lossy(response));
 
     stream.write_all(response)?;
     Ok(())
