@@ -5,9 +5,6 @@ use std::{
 };
 
 fn handle_connection(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
-    let successful_response = "HTTP/1.1 200 OK\r\n\r\n".as_bytes();
-    let failure_response = "HTTP/1.1 404 Not Found\r\n\r\n".as_bytes();
-
     let mut request = String::new();
     stream.read_to_string(&mut request)?;
 
@@ -16,13 +13,13 @@ fn handle_connection(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
     let request_path = request_line.next().unwrap();
 
     let response = if request_path != "/" {
-        failure_response
+        "HTTP/1.1 200 OK\r\n\r\n"
     } else {
-        successful_response
+        "HTTP/1.1 404 Not Found\r\n\r\n"
     };
     // println!("{}", String::from_utf8_lossy(response));
 
-    stream.write_all(response)?;
+    stream.write_all(response.as_bytes())?;
     Ok(())
 }
 
