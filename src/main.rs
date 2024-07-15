@@ -1,10 +1,9 @@
 use std::{
-    error::Error,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
 };
 
-fn handle_connection(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
+fn handle_connection(stream: &mut TcpStream) -> Result<(), std::io::Error> {
     let mut request = String::new();
     stream.read_to_string(&mut request)?;
 
@@ -16,10 +15,12 @@ fn handle_connection(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
         "HTTP/1.1 200 OK\r\n\r\n"
     } else {
         "HTTP/1.1 404 Not Found\r\n\r\n"
-    };
+    }
+    .as_bytes();
     // println!("{}", String::from_utf8_lossy(response));
 
-    stream.write_all(response.as_bytes())?;
+    stream.write_all(response)?;
+    println!("Responded.");
     Ok(())
 }
 
