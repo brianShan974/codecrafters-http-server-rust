@@ -1,11 +1,14 @@
 use std::{
-    io::{Read, Write},
+    io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
 };
 
 fn handle_connection(stream: &mut TcpStream) -> Result<(), std::io::Error> {
+    println!("handle_connection is called.");
+    let mut buf_reader = BufReader::new(stream.try_clone()?);
     let mut request = String::new();
-    stream.read_to_string(&mut request)?;
+    buf_reader.read_line(&mut request)?;
+    println!("request is read to string.");
 
     let mut request_line = request.split("\r\n").next().unwrap().split(' ');
     let _request_type = request_line.next();
