@@ -15,9 +15,9 @@ fn handle_connection(stream: &mut TcpStream) -> Result<(), std::io::Error> {
     let request_path = request_line.next().unwrap();
 
     let response = if request_path != "/" {
-        "HTTP/1.1 200 OK\r\n\r\n"
-    } else {
         "HTTP/1.1 404 Not Found\r\n\r\n"
+    } else {
+        "HTTP/1.1 200 OK\r\n\r\n"
     }
     .as_bytes();
     // println!("{}", String::from_utf8_lossy(response));
