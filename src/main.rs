@@ -19,6 +19,7 @@ fn handle_connection(stream: &mut TcpStream) -> Result<(), std::io::Error> {
     .as_bytes();
     // println!("{}", String::from_utf8_lossy(response));
 
+    println!("Preparing to write the response.");
     stream.write_all(response)?;
     println!("Responded.");
     Ok(())
