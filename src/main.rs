@@ -28,6 +28,9 @@ fn get_url_from_request(request: &str) -> String {
 }
 
 fn parse_url_for_response(url: &str) -> Option<(String, ContentType, usize)> {
+    if url == "/" {
+        return Some((String::new(), ContentType::PlainText, 0));
+    }
     let mut splitted_url = url.split('/').skip(1);
     // println!("{splitted_url:?}");
 
@@ -48,12 +51,16 @@ fn handle_connection(stream: &mut TcpStream) -> Result<()> {
         let response = if let Some((response_body, content_type, content_length)) =
             parse_url_for_response(&url)
         {
-            Response::new(
-                StatusCode::Ok,
-                Some(content_type),
-                Some(content_length),
-                response_body,
-            )
+            if response_body.is_empty() {
+                Response::new(StatusCode::Ok, None, None, response_body)
+            } else {
+                Response::new(
+                    StatusCode::Ok,
+                    Some(content_type),
+                    Some(content_length),
+                    response_body,
+                )
+            }
         } else {
             Response::new(StatusCode::NotFound, None, None, String::new())
         };
