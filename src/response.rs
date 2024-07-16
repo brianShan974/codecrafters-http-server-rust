@@ -1,7 +1,10 @@
+use std::default;
+
 use crate::{response, CRLF};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum StatusCode {
+    #[default]
     Ok,
     NotFound,
 }
@@ -11,7 +14,7 @@ pub enum ContentType {
     PlainText,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Response {
     status: StatusCode,
     content_type: Option<ContentType>,
@@ -31,6 +34,24 @@ impl Response {
             content_type,
             content_length,
             response_body,
+        }
+    }
+
+    pub fn construct_ok_with_body(response_body: String) -> Self {
+        Self {
+            status: StatusCode::Ok,
+            content_type: Some(ContentType::PlainText),
+            content_length: Some(response_body.len()),
+            response_body,
+        }
+    }
+
+    pub fn construct_not_found() -> Self {
+        Self {
+            status: StatusCode::NotFound,
+            content_type: None,
+            content_length: None,
+            response_body: String::new(),
         }
     }
 

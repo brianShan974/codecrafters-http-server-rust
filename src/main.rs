@@ -1,74 +1,20 @@
+mod request;
 mod response;
 
 use std::{
-    io::{BufRead, BufReader, Result, Write},
+    io::{Result, Write},
     net::{TcpListener, TcpStream},
 };
 
-use crate::response::{ContentType, Response, StatusCode};
+use crate::request::Request;
 
 pub const CRLF: &str = "\r\n";
-
-fn get_request(stream: &mut TcpStream) -> Result<String> {
-    let mut buf_reader = BufReader::new(stream.try_clone()?);
-    let mut request = String::new();
-    buf_reader.read_line(&mut request)?;
-
-    Ok(request)
-}
-
-fn get_url_from_request(request: &str) -> String {
-    let request_line = request.split(CRLF).next().unwrap();
-    let mut splitted_request_line = request_line.split(' ');
-
-    let _request_type = splitted_request_line.next();
-    let request_path = splitted_request_line.next().unwrap();
-
-    request_path.to_string()
-}
-
-fn parse_url_for_response(url: &str) -> Option<(String, ContentType, usize)> {
-    if url == "/" {
-        return Some((String::new(), ContentType::PlainText, 0));
-    }
-    let mut splitted_url = url.split('/').skip(1);
-    // println!("{splitted_url:?}");
-
-    let echo = splitted_url.next().unwrap();
-    if echo != "echo" {
-        return None;
-    }
-    let body = splitted_url.next()?;
-
-    Some((body.to_string(), ContentType::PlainText, body.len()))
-}
+pub const DOUBLE_CRLF: &str = "\r\n\r\n";
 
 fn handle_connection(stream: &mut TcpStream) -> Result<()> {
-    let request = get_request(stream)?;
-    let url = get_url_from_request(&request);
-
-    let response = {
-        let response = if let Some((response_body, content_type, content_length)) =
-            parse_url_for_response(&url)
-        {
-            if response_body.is_empty() {
-                Response::new(StatusCode::Ok, None, None, response_body)
-            } else {
-                Response::new(
-                    StatusCode::Ok,
-                    Some(content_type),
-                    Some(content_length),
-                    response_body,
-                )
-            }
-        } else {
-            Response::new(StatusCode::NotFound, None, None, String::new())
-        };
-        response.get_response_string()
-    };
-
-    stream.write_all(response.as_bytes())?;
-
+    let request = Request::read_full_request(stream)?;
+    let response = request.construct_response();
+    stream.write_all(response.get_response_string().as_bytes())?;
     Ok(())
 }
 
