@@ -28,7 +28,7 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let handle = thread::spawn(move || {
+                let handle = thread::spawn(|| {
                     println!("accepted new connection");
                     handle_connection(stream).unwrap();
                 });
