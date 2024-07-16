@@ -12,8 +12,8 @@ use crate::request::Request;
 pub const CRLF: &str = "\r\n";
 pub const DOUBLE_CRLF: &str = "\r\n\r\n";
 
-fn handle_connection(stream: &mut TcpStream) -> Result<()> {
-    let request = Request::read_full_request(stream)?;
+fn handle_connection(mut stream: TcpStream) -> Result<()> {
+    let request = Request::read_full_request(&mut stream)?;
     let response = request.construct_response();
     stream.write_all(response.get_response_string().as_bytes())?;
     Ok(())
@@ -27,10 +27,10 @@ fn main() {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(mut stream) => {
+            Ok(stream) => {
                 let handle = thread::spawn(move || {
                     println!("accepted new connection");
-                    handle_connection(&mut stream).unwrap();
+                    handle_connection(stream).unwrap();
                 });
                 handle.join().unwrap();
             }
