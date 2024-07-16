@@ -4,6 +4,7 @@ mod response;
 use std::{
     io::{Result, Write},
     net::{TcpListener, TcpStream},
+    thread,
 };
 
 use crate::request::Request;
@@ -27,8 +28,11 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
-                println!("accepted new connection");
-                handle_connection(&mut stream).unwrap();
+                let handle = thread::spawn(move || {
+                    println!("accepted new connection");
+                    handle_connection(&mut stream).unwrap();
+                });
+                handle.join().unwrap();
             }
             Err(e) => {
                 println!("error: {}", e);
