@@ -13,6 +13,7 @@ pub const CRLF: &str = "\r\n";
 pub const DOUBLE_CRLF: &str = "\r\n\r\n";
 
 fn handle_connection(mut stream: TcpStream) -> Result<()> {
+    let mut stream = stream.try_clone()?;
     let request = Request::read_full_request(&mut stream)?;
     let response = request.construct_response();
     stream.write_all(response.get_response_string().as_bytes())?;
