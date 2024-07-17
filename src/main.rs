@@ -27,7 +27,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
     let response = request.construct_response();
     // println!("response constructed.");
     let response_string = response.get_response_string();
-    println!("response: {}", response_string);
+    // println!("response: {}", response_string);
     stream.write_all(response_string.as_bytes())?;
     // println!("response written.");
     Ok(())
