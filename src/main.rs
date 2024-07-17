@@ -26,17 +26,25 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
 
     for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let handle = thread::spawn(|| {
-                    println!("accepted new connection");
-                    handle_connection(stream).unwrap();
-                });
-                handle.join().unwrap();
-            }
-            Err(e) => {
-                println!("error: {}", e);
-            }
-        }
+        // match stream {
+        //     Ok(stream) => {
+        //         let handle = thread::spawn(|| {
+        //             println!("accepted new connection");
+        //             handle_connection(stream).unwrap();
+        //         });
+        //         handle.join().unwrap();
+        //     }
+        //     Err(e) => {
+        //         println!("error: {}", e);
+        //     }
+        // }
+        let stream = stream.unwrap();
+
+        let handle = thread::spawn(|| {
+            println!("accepted new connection");
+            handle_connection(stream).unwrap();
+        });
+
+        handle.join().unwrap();
     }
 }
