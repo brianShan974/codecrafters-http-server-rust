@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
-    fs,
-    io::{BufRead, BufReader, Result},
+    fs::{self, File},
+    io::{BufRead, BufReader, Result, Write},
     net::TcpStream,
 };
 
@@ -10,8 +10,11 @@ use crate::{
     CRLF, DOUBLE_CRLF, PATH,
 };
 
+pub const HTTP_PROTOCOL: &str = "HTTP/1.1";
+
 pub enum RequestType {
     Get,
+    Post,
 }
 
 pub enum ProtocolVersion {
@@ -27,11 +30,18 @@ pub struct RequestLine {
 impl RequestLine {
     pub fn parse_line(line: &str) -> Option<Self> {
         let line: Vec<&str> = line.split(' ').collect();
-        if line.len() != 3 || line[0] != "GET" || line[2] != "HTTP/1.1" {
+        if line.len() != 3 || line[2] != HTTP_PROTOCOL {
             None
         } else {
+            let request_type = if line[0] == "GET" {
+                RequestType::Get
+            } else if line[0] == "POST" {
+                RequestType::Post
+            } else {
+                return None;
+            };
             Some(Self {
-                request_type: RequestType::Get,
+                request_type,
                 url: line[1].to_string(),
                 protocol: ProtocolVersion::HTTP1P1,
             })
@@ -133,14 +143,33 @@ impl Request {
                 return Response::construct_not_found();
             };
             Response::construct_ok_with_body(response_body, ContentType::PlainText)
-        } else if head == "files" && length > 1 {
-            let path = splitted_url[1];
-            let file_string = if let Ok(file_string) = Self::read_from_file(path) {
-                file_string
-            } else {
+        } else if head == "files" {
+            if length <= 1 {
                 return Response::construct_not_found();
+            }
+            let path = splitted_url[1];
+            let path = if !PATH.ends_with('/') {
+                PATH.to_string() + path
+            } else {
+                PATH.to_string() + "/" + path
             };
-            Response::construct_ok_with_body(file_string, ContentType::OctetStream)
+            match self.line.request_type {
+                RequestType::Get => {
+                    let file_string = if let Ok(file_string) = Self::read_from_file(&path) {
+                        file_string
+                    } else {
+                        return Response::construct_not_found();
+                    };
+                    Response::construct_ok_with_body(file_string, ContentType::OctetStream)
+                }
+                RequestType::Post => {
+                    if Self::create_file(&path, self.body.clone()).is_ok() {
+                        Response::construct_created()
+                    } else {
+                        Response::construct_not_found()
+                    }
+                }
+            }
         } else {
             Response::construct_not_found()
         }
@@ -171,11 +200,11 @@ impl Request {
     }
 
     fn read_from_file(path: &str) -> Result<String> {
-        let full_path = if !PATH.ends_with('/') {
-            PATH.to_string() + path
-        } else {
-            PATH.to_string() + "/" + path
-        };
-        fs::read_to_string(full_path)
+        fs::read_to_string(path)
+    }
+
+    fn create_file(path: &str, content: String) -> Result<()> {
+        let mut file = File::create(path)?;
+        file.write_all(content.as_bytes())
     }
 }

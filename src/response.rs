@@ -7,6 +7,7 @@ pub enum StatusCode {
     #[default]
     Ok,
     NotFound,
+    Created,
 }
 
 #[derive(Debug)]
@@ -47,6 +48,15 @@ impl Response {
         }
     }
 
+    pub fn construct_created() -> Self {
+        Self {
+            status: StatusCode::Created,
+            content_type: None,
+            content_length: None,
+            response_body: String::new(),
+        }
+    }
+
     pub fn construct_not_found() -> Self {
         Self {
             status: StatusCode::NotFound,
@@ -66,8 +76,13 @@ impl Response {
         response.push_str(match self.status {
             StatusCode::Ok => "HTTP/1.1 200 OK",
             StatusCode::NotFound => "HTTP/1.1 404 Not Found",
+            StatusCode::Created => "HTTP/1.1 201 Created",
         });
         response.push_str(CRLF);
+
+        if let StatusCode::Created = self.status {
+            return response;
+        }
 
         if let Some(content_type) = &self.content_type {
             response.push_str("Content-Type: ");
