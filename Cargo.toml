@@ -19,7 +19,7 @@ edition = "2021"
 #
 # DON'T EDIT THIS!
 [dependencies]
-clap = { version = "3.2.25", features = ["derive"] }
+clap = { version = "=4.0.32", features = ["derive"] }
 lazy_static = "1.5.0"
 
 [dev-dependencies]
