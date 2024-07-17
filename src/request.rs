@@ -81,7 +81,9 @@ impl Request {
     }
 
     pub fn read_full_request(stream: &mut TcpStream) -> Result<Self> {
+        println!("read_full_request called.");
         let buf_reader = BufReader::new(stream.try_clone()?);
+        println!("stream cloned into buf_reader.");
         let request: Vec<_> = buf_reader
             .lines()
             .map(|result| result.unwrap())
