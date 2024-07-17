@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
+    fs,
     io::{BufRead, BufReader, Result},
     net::TcpStream,
 };
 
 use crate::{
-    response::{self, Response, StatusCode},
-    CRLF, DOUBLE_CRLF,
+    response::{ContentType, Response},
+    CRLF, DOUBLE_CRLF, PATH,
 };
 
 pub enum RequestType {
@@ -124,14 +125,22 @@ impl Request {
         let (head, length) = (splitted_url[0], splitted_url.len());
         if head == "echo" && length > 1 {
             let response_body = splitted_url[1].to_string();
-            Response::construct_ok_with_body(response_body)
+            Response::construct_ok_with_body(response_body, ContentType::PlainText)
         } else if head == "user-agent" {
             let response_body = if let Some(user_agent) = self.read_field_from_header(head) {
                 user_agent.to_string()
             } else {
                 return Response::construct_not_found();
             };
-            Response::construct_ok_with_body(response_body)
+            Response::construct_ok_with_body(response_body, ContentType::PlainText)
+        } else if head == "files" && length > 1 {
+            let path = splitted_url[1];
+            let file_string = if let Ok(file_string) = Self::read_from_file(path) {
+                file_string
+            } else {
+                return Response::construct_not_found();
+            };
+            Response::construct_ok_with_body(file_string, ContentType::OctetStream)
         } else {
             Response::construct_not_found()
         }
@@ -159,5 +168,14 @@ impl Request {
         let (key, value) = header_line.split_once(": ")?;
 
         Some((key.to_lowercase(), value.to_string()))
+    }
+
+    fn read_from_file(path: &str) -> Result<String> {
+        let full_path = if !PATH.ends_with('/') {
+            PATH.to_string() + path
+        } else {
+            PATH.to_string() + "/" + path
+        };
+        fs::read_to_string(full_path)
     }
 }

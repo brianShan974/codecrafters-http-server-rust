@@ -12,6 +12,7 @@ pub enum StatusCode {
 #[derive(Debug)]
 pub enum ContentType {
     PlainText,
+    OctetStream,
 }
 
 #[derive(Debug, Default)]
@@ -37,10 +38,10 @@ impl Response {
         }
     }
 
-    pub fn construct_ok_with_body(response_body: String) -> Self {
+    pub fn construct_ok_with_body(response_body: String, content_type: ContentType) -> Self {
         Self {
             status: StatusCode::Ok,
-            content_type: Some(ContentType::PlainText),
+            content_type: Some(content_type),
             content_length: Some(response_body.len()),
             response_body,
         }
@@ -68,8 +69,12 @@ impl Response {
         });
         response.push_str(CRLF);
 
-        if let Some(ContentType::PlainText) = self.content_type {
-            response.push_str("Content-Type: text/plain");
+        if let Some(content_type) = &self.content_type {
+            response.push_str("Content-Type: ");
+            response.push_str(match content_type {
+                ContentType::PlainText => "text/plain",
+                ContentType::OctetStream => "application/octet-stream",
+            });
             response.push_str(CRLF);
 
             if let Some(size) = self.content_length {
