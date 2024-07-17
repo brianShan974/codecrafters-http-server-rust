@@ -46,11 +46,9 @@ fn main() {
         // }
         let stream = stream.unwrap();
 
-        let handle = thread::spawn(move || {
-            println!("thread {} accepted new connection", i);
+        let _handle = thread::spawn(move || {
+            println!("thread {} accepted new connection", i + 1);
             handle_connection(stream).unwrap();
         });
-
-        handle.join().unwrap();
     }
 }
