@@ -89,6 +89,7 @@ impl Request {
             .map(|result| result.unwrap())
             .take_while(|line| !line.is_empty())
             .collect();
+        println!("request read as lines.");
 
         if request.len() == 1 {
             return Ok(Self::parse_string(request[0].clone() + CRLF));
