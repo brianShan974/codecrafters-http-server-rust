@@ -13,13 +13,15 @@ pub const CRLF: &str = "\r\n";
 pub const DOUBLE_CRLF: &str = "\r\n\r\n";
 
 fn handle_connection(mut stream: TcpStream) -> Result<()> {
-    println!("handle_connection called.");
+    // println!("handle_connection called.");
     let request = Request::read_full_request(&mut stream)?;
-    println!("request read into struct.");
+    // println!("request read into struct.");
     let response = request.construct_response();
-    println!("response constructed.");
-    stream.write_all(response.get_response_string().as_bytes())?;
-    println!("response written.");
+    // println!("response constructed.");
+    let response_string = response.get_response_string();
+    println!("response: {}", response_string);
+    stream.write_all(response_string.as_bytes())?;
+    // println!("response written.");
     Ok(())
 }
 
@@ -29,7 +31,7 @@ fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
 
-    for stream in listener.incoming() {
+    for (i, stream) in listener.incoming().enumerate() {
         // match stream {
         //     Ok(stream) => {
         //         let handle = thread::spawn(|| {
@@ -44,8 +46,8 @@ fn main() {
         // }
         let stream = stream.unwrap();
 
-        let handle = thread::spawn(|| {
-            println!("accepted new connection");
+        let handle = thread::spawn(move || {
+            println!("thread {} accepted new connection", i);
             handle_connection(stream).unwrap();
         });
 
