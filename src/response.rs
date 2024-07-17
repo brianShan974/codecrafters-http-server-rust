@@ -1,6 +1,6 @@
 use std::default;
 
-use crate::{response, CRLF};
+use crate::{request::HTTP_PROTOCOL, response, CRLF};
 
 #[derive(Debug, Default)]
 pub enum StatusCode {
@@ -73,14 +73,16 @@ impl Response {
     pub fn get_response_string(&self) -> String {
         let mut response = String::new();
 
+        response.push_str(HTTP_PROTOCOL);
         response.push_str(match self.status {
-            StatusCode::Ok => "HTTP/1.1 200 OK",
-            StatusCode::NotFound => "HTTP/1.1 404 Not Found",
-            StatusCode::Created => "HTTP/1.1 201 Created",
+            StatusCode::Ok => " 200 OK",
+            StatusCode::NotFound => " 404 Not Found",
+            StatusCode::Created => " 201 Created",
         });
         response.push_str(CRLF);
 
         if let StatusCode::Created = self.status {
+            response.push_str(CRLF);
             return response;
         }
 

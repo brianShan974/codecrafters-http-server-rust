@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs::{self, File},
+    fs,
     io::{BufRead, BufReader, Result, Write},
     net::TcpStream,
 };
@@ -204,7 +204,7 @@ impl Request {
     }
 
     fn create_file(path: &str, content: String) -> Result<()> {
-        let mut file = File::create(path)?;
+        let mut file = fs::File::create(path)?;
         file.write_all(content.as_bytes())
     }
 }
