@@ -195,6 +195,7 @@ impl Request {
             let result = Self::compress_with_gzip(&response_body);
             let result = unsafe { String::from_utf8_unchecked(result) };
             response_body.push_str(&result);
+            *headers.get_mut("Content-Length").unwrap() = response_body.len().to_string();
         }
         Response::construct_ok_with_body(response_body, Some(headers))
     }
@@ -281,7 +282,8 @@ impl Request {
 
     fn compress_with_gzip(input: &str) -> Vec<u8> {
         let buffer: Vec<u8> = Vec::new();
-        let mut encoder = ZlibEncoder::new(buffer, Compression::default());
+        let compression_level = Compression::default();
+        let mut encoder = ZlibEncoder::new(buffer, compression_level);
         encoder.write_all(input.as_bytes()).unwrap();
         encoder.finish().unwrap()
     }
