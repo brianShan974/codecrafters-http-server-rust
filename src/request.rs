@@ -1,10 +1,11 @@
 use std::{
     collections::HashMap,
     fs,
-    io::{BufRead, BufReader, Read, Result},
+    io::{prelude::*, BufReader, Result},
     net::TcpStream,
-    ops::Deref,
 };
+
+use flate2::{write::ZlibEncoder, Compression};
 
 use crate::{
     response::{ContentType, Response},
@@ -182,13 +183,18 @@ impl Request {
     }
 
     fn construct_echo_response(&self, splitted_url: Vec<&str>) -> Response {
-        let response_body = splitted_url[1].to_string();
+        let mut response_body = splitted_url[1].to_string();
         let mut headers = self.construct_headers(ContentType::PlainText, &response_body);
         if let Some(encodings) = self.headers.get("accept-encoding") {
             let encoding = self.find_available_encoding(encodings);
             if let Some(encoding) = encoding {
                 headers.insert("Content-Encoding".to_string(), encoding);
             }
+        }
+        if let Some("gzip") = headers.get("Content-Encoding").map(|s| s.as_str()) {
+            let result = Self::compress_with_gzip(&response_body);
+            let result = unsafe { String::from_utf8_unchecked(result) };
+            response_body.push_str(&result);
         }
         Response::construct_ok_with_body(response_body, Some(headers))
     }
@@ -271,5 +277,12 @@ impl Request {
 
     fn create_file(path: &str, content: String) -> Result<()> {
         fs::write(path, content.clone())
+    }
+
+    fn compress_with_gzip(input: &str) -> Vec<u8> {
+        let buffer: Vec<u8> = Vec::new();
+        let mut encoder = ZlibEncoder::new(buffer, Compression::default());
+        encoder.write_all(input.as_bytes()).unwrap();
+        encoder.finish().unwrap()
     }
 }
