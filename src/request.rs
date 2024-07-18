@@ -184,9 +184,10 @@ impl Request {
     fn construct_echo_response(&self, splitted_url: Vec<&str>) -> Response {
         let response_body = splitted_url[1].to_string();
         let mut headers = self.construct_headers(ContentType::PlainText, &response_body);
-        if let Some(encoding) = self.headers.get("accept-encoding") {
-            if AVAILABLE_ENCODINGS.contains(&encoding.deref()) {
-                headers.insert("Content-Encoding".to_string(), encoding.to_string());
+        if let Some(encodings) = self.headers.get("accept-encoding") {
+            let encoding = self.find_available_encoding(encodings);
+            if let Some(encoding) = encoding {
+                headers.insert("Content-Encoding".to_string(), encoding);
             }
         }
         Response::construct_ok_with_body(response_body, Some(headers))
@@ -244,6 +245,14 @@ impl Request {
             response_body.len().to_string(),
         );
         headers
+    }
+
+    fn find_available_encoding(&self, encodings: &str) -> Option<String> {
+        encodings
+            .split(", ")
+            .filter(|encoding| AVAILABLE_ENCODINGS.contains(encoding))
+            .map(|encoding| encoding.to_string())
+            .next()
     }
 
     fn parse_header_line(header_line: &str) -> Option<(String, String)> {
