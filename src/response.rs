@@ -1,4 +1,4 @@
-use std::default;
+use std::collections::HashMap;
 
 use crate::{request::HTTP_PROTOCOL, response, CRLF};
 
@@ -16,34 +16,47 @@ pub enum ContentType {
     OctetStream,
 }
 
+impl ToString for ContentType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::PlainText => "text/plain".to_string(),
+            Self::OctetStream => "application/octet-stream".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Response {
     status: StatusCode,
-    content_type: Option<ContentType>,
-    content_length: Option<usize>,
+    headers: HashMap<String, String>,
     response_body: String,
 }
 
 impl Response {
     pub fn new(
         status: StatusCode,
-        content_type: Option<ContentType>,
-        content_length: Option<usize>,
+        headers: HashMap<String, String>,
         response_body: String,
     ) -> Self {
         Self {
             status,
-            content_type,
-            content_length,
+            headers,
             response_body,
         }
     }
 
-    pub fn construct_ok_with_body(response_body: String, content_type: ContentType) -> Self {
+    pub fn construct_ok_with_body(
+        response_body: String,
+        headers: Option<HashMap<String, String>>,
+    ) -> Self {
+        let headers = if let Some(headers) = headers {
+            headers
+        } else {
+            HashMap::new()
+        };
         Self {
             status: StatusCode::Ok,
-            content_type: Some(content_type),
-            content_length: Some(response_body.len()),
+            headers,
             response_body,
         }
     }
@@ -51,8 +64,7 @@ impl Response {
     pub fn construct_created() -> Self {
         Self {
             status: StatusCode::Created,
-            content_type: None,
-            content_length: None,
+            headers: HashMap::new(),
             response_body: String::new(),
         }
     }
@@ -60,52 +72,52 @@ impl Response {
     pub fn construct_not_found() -> Self {
         Self {
             status: StatusCode::NotFound,
-            content_type: None,
-            content_length: None,
+            headers: HashMap::new(),
             response_body: String::new(),
         }
-    }
-
-    pub fn set_response_body(&mut self, body: String) {
-        self.response_body = body;
     }
 
     pub fn get_response_string(&self) -> String {
         let mut response = String::new();
 
-        response.push_str(HTTP_PROTOCOL);
-        response.push_str(match self.status {
-            StatusCode::Ok => " 200 OK",
-            StatusCode::NotFound => " 404 Not Found",
-            StatusCode::Created => " 201 Created",
-        });
-        response.push_str(CRLF);
+        self.push_status_line_string(&mut response);
 
         if let StatusCode::Created = self.status {
             response.push_str(CRLF);
             return response;
         }
 
-        if let Some(content_type) = &self.content_type {
-            response.push_str("Content-Type: ");
-            response.push_str(match content_type {
-                ContentType::PlainText => "text/plain",
-                ContentType::OctetStream => "application/octet-stream",
-            });
-            response.push_str(CRLF);
+        self.push_header_string(&mut response);
 
-            if let Some(size) = self.content_length {
-                response.push_str(&format!("Content-Length: {}", size));
-                response.push_str(CRLF);
-            }
-        }
-        response.push_str(CRLF);
-
-        if !self.response_body.is_empty() {
-            response.push_str(&self.response_body);
-            response.push_str(CRLF);
-        }
+        self.push_body_string(&mut response);
 
         response
+    }
+
+    fn push_status_line_string(&self, dest: &mut String) {
+        dest.push_str(HTTP_PROTOCOL);
+        dest.push_str(match self.status {
+            StatusCode::Ok => " 200 OK",
+            StatusCode::NotFound => " 404 Not Found",
+            StatusCode::Created => " 201 Created",
+        });
+        dest.push_str(CRLF);
+    }
+
+    fn push_header_string(&self, dest: &mut String) {
+        for (key, val) in &self.headers {
+            dest.push_str(key);
+            dest.push_str(": ");
+            dest.push_str(val);
+            dest.push_str(CRLF);
+        }
+        dest.push_str(CRLF);
+    }
+
+    fn push_body_string(&self, dest: &mut String) {
+        if !self.response_body.is_empty() {
+            dest.push_str(&self.response_body);
+            dest.push_str(CRLF);
+        }
     }
 }

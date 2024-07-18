@@ -3,6 +3,7 @@ use std::{
     fs,
     io::{BufRead, BufReader, Read, Result},
     net::TcpStream,
+    ops::Deref,
 };
 
 use crate::{
@@ -11,6 +12,7 @@ use crate::{
 };
 
 pub const HTTP_PROTOCOL: &str = "HTTP/1.1";
+pub const AVAILABLE_ENCODINGS: [&str; 1] = ["gzip"];
 
 #[derive(Debug)]
 pub enum RequestType {
@@ -102,43 +104,6 @@ impl Request {
         let mut has_content: bool = false;
         let mut content_length: usize = 0;
         let mut should_start_reading_body: bool = false;
-        // let request: Vec<String> = buf_reader
-        //     .lines()
-        //     .map(|result| result.unwrap())
-        //     // .take_while(|line| {
-        //     //     if line.starts_with("Content-Length") {
-        //     //         let num_str = line.split(": ").nth(1).unwrap();
-        //     //         content_length = num_str.parse().expect("Invalid format of content length.");
-        //     //         has_content = true;
-        //     //     }
-        //     //     !line.is_empty()
-        //     // })
-        //     .take_while(move |line| {
-        //         if line.starts_with("Content-Length") {
-        //             let num_str = line.split(": ").nth(1).unwrap();
-        //             content_length = num_str.parse().expect("Invalid format of content length.");
-        //             has_content = true;
-        //         }
-        //         let result = !line.is_empty() || (has_content && content_length != 0);
-        //         if line.is_empty() {
-        //             has_content = false;
-        //         }
-        //         result
-        //     })
-        //     .filter(|line| !line.is_empty())
-        //     .collect();
-        // if has_content && content_length != 0 {
-        //     let buf_reader = BufReader::new(stream.try_clone()?);
-        //     let lines: Vec<String> = buf_reader
-        //         .lines()
-        //         // .skip(1)
-        //         .map(|result| result.unwrap())
-        //         .take_while(|line| !line.is_empty())
-        //         .collect();
-        //     println!("{:?}", lines);
-        //     request.extend(lines);
-        // }
-        // let mut request: Vec<String> = Vec::new();
 
         let mut request: Vec<String> = Vec::new();
 
@@ -147,7 +112,7 @@ impl Request {
             if !should_start_reading_body {
                 buf_reader.read_line(&mut line)?;
             } else {
-                println!("I should start reading content body.");
+                // println!("I should start reading content body.");
                 let mut buffer = vec![0; content_length];
                 buf_reader.read_exact(&mut buffer)?;
                 line.extend(buffer.iter().map(|c| *c as char));
@@ -156,15 +121,15 @@ impl Request {
             }
             let trimmed_line = line.trim();
             if !trimmed_line.is_empty() {
-                println!("The line is not empty so I'm pushing it into the vector.");
+                // println!("The line is not empty so I'm pushing it into the vector.");
                 request.push(trimmed_line.to_string());
             } else if has_content && content_length != 0 {
-                println!("The line is empty itself, but it still has content so I'm pushing later lines into the vector.");
+                // println!("The line is empty itself, but it still has content so I'm pushing later lines into the vector.");
                 has_content = false;
                 should_start_reading_body = true;
                 continue;
             } else {
-                println!("The line is empty, and there is no content left so I'm quitting.");
+                // println!("The line is empty, and there is no content left so I'm quitting.");
                 break;
             }
             if line.starts_with("Content-Length") {
@@ -172,7 +137,7 @@ impl Request {
                 content_length = num_str.parse().expect("Invalid format of content length.");
                 has_content = true;
             }
-            println!();
+            // println!();
             line.clear();
         }
 
@@ -183,7 +148,7 @@ impl Request {
             String::new()
         };
 
-        println!("request read as lines: {:?}", request);
+        // println!("request read as lines: {:?}", request);
 
         if request.len() == 1 {
             return Ok(Self::parse_string_with_body(
@@ -206,59 +171,71 @@ impl Request {
         let splitted_url: Vec<_> = url.split('/').skip(1).collect();
         let (head, length) = (splitted_url[0], splitted_url.len());
         if head == "echo" && length > 1 {
-            let response_body = splitted_url[1].to_string();
-            Response::construct_ok_with_body(response_body, ContentType::PlainText)
+            self.construct_echo_response(splitted_url)
         } else if head == "user-agent" {
-            let response_body = if let Some(user_agent) = self.read_field_from_header(head) {
-                user_agent.to_string()
-            } else {
-                return Response::construct_not_found();
-            };
-            Response::construct_ok_with_body(response_body, ContentType::PlainText)
+            self.construct_user_agent_response(splitted_url)
         } else if head == "files" {
-            if length <= 1 {
-                return Response::construct_not_found();
-            }
-            let path = splitted_url[1];
-            let path = if !PATH.ends_with('/') {
-                PATH.to_string() + path
-            } else {
-                PATH.to_string() + "/" + path
-            };
-            match self.line.request_type {
-                RequestType::Get => {
-                    let file_string = if let Ok(file_string) = Self::read_from_file(&path) {
-                        file_string
-                    } else {
-                        return Response::construct_not_found();
-                    };
-                    Response::construct_ok_with_body(file_string, ContentType::OctetStream)
-                }
-                RequestType::Post => {
-                    if Self::create_file(&path, self.body.clone()).is_ok() {
-                        Response::construct_created()
-                    } else {
-                        Response::construct_not_found()
-                    }
-                }
-            }
+            self.construct_file_response(splitted_url)
         } else {
             Response::construct_not_found()
         }
     }
 
-    fn parse_headers(header_string: &str) -> HashMap<String, String> {
-        let header_lines = header_string.split(CRLF);
-
+    fn construct_echo_response(&self, splitted_url: Vec<&str>) -> Response {
+        let response_body = splitted_url[1].to_string();
         let mut headers = HashMap::new();
-
-        for line in header_lines {
-            if let Some((key, value)) = Self::parse_header_line(line) {
-                headers.insert(key, value);
+        headers.insert(
+            "Content-Type".to_string(),
+            ContentType::PlainText.to_string(),
+        );
+        headers.insert(
+            "Content-Length".to_string(),
+            response_body.len().to_string(),
+        );
+        if let Some(encoding) = self.headers.get("accept-encoding") {
+            if AVAILABLE_ENCODINGS.contains(&encoding.deref()) {
+                headers.insert("Content-Encoding".to_string(), encoding.to_string());
             }
         }
+        Response::construct_ok_with_body(response_body, Some(headers))
+    }
 
-        headers
+    fn construct_user_agent_response(&self, splitted_url: Vec<&str>) -> Response {
+        let response_body = if let Some(user_agent) = self.read_field_from_header(splitted_url[0]) {
+            user_agent.to_string()
+        } else {
+            return Response::construct_not_found();
+        };
+        Response::construct_ok_with_body(response_body, None)
+    }
+
+    fn construct_file_response(&self, splitted_url: Vec<&str>) -> Response {
+        if splitted_url.len() <= 1 {
+            return Response::construct_not_found();
+        }
+        let path = splitted_url[1];
+        let path = if !PATH.ends_with('/') {
+            PATH.to_string() + path
+        } else {
+            PATH.to_string() + "/" + path
+        };
+        match self.line.request_type {
+            RequestType::Get => {
+                let file_string = if let Ok(file_string) = Self::read_from_file(&path) {
+                    file_string
+                } else {
+                    return Response::construct_not_found();
+                };
+                Response::construct_ok_with_body(file_string, None)
+            }
+            RequestType::Post => {
+                if Self::create_file(&path, self.body.clone()).is_ok() {
+                    Response::construct_created()
+                } else {
+                    Response::construct_not_found()
+                }
+            }
+        }
     }
 
     fn parse_header_line(header_line: &str) -> Option<(String, String)> {
