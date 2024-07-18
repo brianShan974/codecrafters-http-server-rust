@@ -183,15 +183,7 @@ impl Request {
 
     fn construct_echo_response(&self, splitted_url: Vec<&str>) -> Response {
         let response_body = splitted_url[1].to_string();
-        let mut headers = HashMap::new();
-        headers.insert(
-            "Content-Type".to_string(),
-            ContentType::PlainText.to_string(),
-        );
-        headers.insert(
-            "Content-Length".to_string(),
-            response_body.len().to_string(),
-        );
+        let mut headers = self.construct_headers(ContentType::PlainText, &response_body);
         if let Some(encoding) = self.headers.get("accept-encoding") {
             if AVAILABLE_ENCODINGS.contains(&encoding.deref()) {
                 headers.insert("Content-Encoding".to_string(), encoding.to_string());
@@ -206,7 +198,8 @@ impl Request {
         } else {
             return Response::construct_not_found();
         };
-        Response::construct_ok_with_body(response_body, None)
+        let headers = self.construct_headers(ContentType::PlainText, &response_body);
+        Response::construct_ok_with_body(response_body, Some(headers))
     }
 
     fn construct_file_response(&self, splitted_url: Vec<&str>) -> Response {
@@ -226,7 +219,8 @@ impl Request {
                 } else {
                     return Response::construct_not_found();
                 };
-                Response::construct_ok_with_body(file_string, None)
+                let headers = self.construct_headers(ContentType::OctetStream, &file_string);
+                Response::construct_ok_with_body(file_string, Some(headers))
             }
             RequestType::Post => {
                 if Self::create_file(&path, self.body.clone()).is_ok() {
@@ -236,6 +230,20 @@ impl Request {
                 }
             }
         }
+    }
+
+    fn construct_headers(
+        &self,
+        content_type: ContentType,
+        response_body: &str,
+    ) -> HashMap<String, String> {
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), content_type.to_string());
+        headers.insert(
+            "Content-Length".to_string(),
+            response_body.len().to_string(),
+        );
+        headers
     }
 
     fn parse_header_line(header_line: &str) -> Option<(String, String)> {
