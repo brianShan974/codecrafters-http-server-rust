@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs,
-    io::{BufRead, BufReader, Result, Write},
+    io::{BufRead, BufReader, Read, Result},
     net::TcpStream,
 };
 
@@ -12,15 +12,18 @@ use crate::{
 
 pub const HTTP_PROTOCOL: &str = "HTTP/1.1";
 
+#[derive(Debug)]
 pub enum RequestType {
     Get,
     Post,
 }
 
+#[derive(Debug)]
 pub enum ProtocolVersion {
     HTTP1P1,
 }
 
+#[derive(Debug)]
 pub struct RequestLine {
     request_type: RequestType,
     url: String,
@@ -49,6 +52,7 @@ impl RequestLine {
     }
 }
 
+#[derive(Debug)]
 pub struct Request {
     line: RequestLine,
     headers: HashMap<String, String>,
@@ -56,7 +60,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn parse_string(request_string: String) -> Self {
+    pub fn parse_string_with_body(request_string: String, body: String) -> Self {
         let splitted_request: Vec<&str> = request_string.as_str().split(DOUBLE_CRLF).collect();
         let line_and_headers: Vec<&str> = splitted_request[0].split(CRLF).collect();
 
@@ -73,11 +77,11 @@ impl Request {
             }
         }
 
-        let body = if splitted_request.len() > 1 && !splitted_request[1].is_empty() {
-            String::from(splitted_request[1])
-        } else {
-            String::new()
-        };
+        // let body = if splitted_request.len() > 1 && !splitted_request[1].is_empty() {
+        //     String::from(splitted_request[1])
+        // } else {
+        //     String::new()
+        // };
 
         Self {
             line,
@@ -93,36 +97,104 @@ impl Request {
 
     pub fn read_full_request(stream: &mut TcpStream) -> Result<Self> {
         // println!("read_full_request called.");
-        let buf_reader = BufReader::new(stream.try_clone()?);
+        let mut buf_reader = BufReader::new(stream.try_clone()?);
         // println!("stream cloned into buf_reader.");
-        let request: Vec<_> = buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect();
-        // println!("request read as lines.");
+        let mut has_content: bool = false;
+        let mut content_length: usize = 0;
+        let mut should_start_reading_body: bool = false;
+        // let request: Vec<String> = buf_reader
+        //     .lines()
+        //     .map(|result| result.unwrap())
+        //     // .take_while(|line| {
+        //     //     if line.starts_with("Content-Length") {
+        //     //         let num_str = line.split(": ").nth(1).unwrap();
+        //     //         content_length = num_str.parse().expect("Invalid format of content length.");
+        //     //         has_content = true;
+        //     //     }
+        //     //     !line.is_empty()
+        //     // })
+        //     .take_while(move |line| {
+        //         if line.starts_with("Content-Length") {
+        //             let num_str = line.split(": ").nth(1).unwrap();
+        //             content_length = num_str.parse().expect("Invalid format of content length.");
+        //             has_content = true;
+        //         }
+        //         let result = !line.is_empty() || (has_content && content_length != 0);
+        //         if line.is_empty() {
+        //             has_content = false;
+        //         }
+        //         result
+        //     })
+        //     .filter(|line| !line.is_empty())
+        //     .collect();
+        // if has_content && content_length != 0 {
+        //     let buf_reader = BufReader::new(stream.try_clone()?);
+        //     let lines: Vec<String> = buf_reader
+        //         .lines()
+        //         // .skip(1)
+        //         .map(|result| result.unwrap())
+        //         .take_while(|line| !line.is_empty())
+        //         .collect();
+        //     println!("{:?}", lines);
+        //     request.extend(lines);
+        // }
+        // let mut request: Vec<String> = Vec::new();
 
-        if request.len() == 1 {
-            return Ok(Self::parse_string(request[0].clone() + CRLF));
-        }
+        let mut request: Vec<String> = Vec::new();
 
-        let mut n = None;
-        for (i, line) in request.iter().enumerate().skip(1) {
-            if !line.contains(": ") {
-                n = Some(i);
+        let mut line = String::new();
+        loop {
+            if !should_start_reading_body {
+                buf_reader.read_line(&mut line)?;
+            } else {
+                println!("I should start reading content body.");
+                let mut buffer = vec![0; content_length];
+                buf_reader.read_exact(&mut buffer)?;
+                line.extend(buffer.iter().map(|c| *c as char));
+                request.push(line.trim().to_string());
                 break;
             }
+            let trimmed_line = line.trim();
+            if !trimmed_line.is_empty() {
+                println!("The line is not empty so I'm pushing it into the vector.");
+                request.push(trimmed_line.to_string());
+            } else if has_content && content_length != 0 {
+                println!("The line is empty itself, but it still has content so I'm pushing later lines into the vector.");
+                has_content = false;
+                should_start_reading_body = true;
+                continue;
+            } else {
+                println!("The line is empty, and there is no content left so I'm quitting.");
+                break;
+            }
+            if line.starts_with("Content-Length") {
+                let num_str = trimmed_line.split(": ").nth(1).unwrap();
+                content_length = num_str.parse().expect("Invalid format of content length.");
+                has_content = true;
+            }
+            println!();
+            line.clear();
         }
 
-        if let Some(n) = n {
-            let (line_and_headers, body) = request.split_at(n);
-            let line_and_headers = line_and_headers.join(CRLF);
-            let body = body.join("\n");
-            let parse_string = [line_and_headers, body].join(DOUBLE_CRLF);
-            Ok(Self::parse_string(parse_string))
+        let body = if content_length > 0 {
+            let last = request.len() - 1;
+            request[last].clone()
         } else {
-            Ok(Self::parse_string(request.join(CRLF)))
+            String::new()
+        };
+
+        println!("request read as lines: {:?}", request);
+
+        if request.len() == 1 {
+            return Ok(Self::parse_string_with_body(
+                request[0].clone() + CRLF,
+                body,
+            ));
         }
+
+        let request = Self::parse_string_with_body(request.join(CRLF), body);
+
+        Ok(request)
     }
 
     pub fn construct_response(&self) -> Response {
@@ -204,7 +276,6 @@ impl Request {
     }
 
     fn create_file(path: &str, content: String) -> Result<()> {
-        let mut file = fs::File::create(path)?;
-        file.write_all(content.as_bytes())
+        fs::write(path, content.clone())
     }
 }
