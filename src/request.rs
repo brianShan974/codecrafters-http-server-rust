@@ -5,7 +5,7 @@ use std::{
     net::TcpStream,
 };
 
-use flate2::{write::ZlibEncoder, Compression};
+use flate2::{write::GzEncoder, Compression};
 
 use crate::{
     response::{ContentType, Response},
@@ -282,10 +282,15 @@ impl Request {
     }
 
     fn compress_with_gzip(input: &str) -> Vec<u8> {
+        println!("before encoding: {input}");
         let buffer: Vec<u8> = Vec::new();
         let compression_level = Compression::default();
-        let mut encoder = ZlibEncoder::new(buffer, compression_level);
+        let mut encoder = GzEncoder::new(buffer, compression_level);
         encoder.write_all(input.as_bytes()).unwrap();
-        encoder.finish().unwrap()
+        let result = encoder.finish().unwrap();
+        println!("encoded: {}", unsafe {
+            String::from_utf8_unchecked(result.clone())
+        });
+        result
     }
 }
