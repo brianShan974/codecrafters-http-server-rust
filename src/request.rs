@@ -194,6 +194,7 @@ impl Request {
         if let Some("gzip") = headers.get("Content-Encoding").map(|s| s.as_str()) {
             let result = Self::compress_with_gzip(&response_body);
             let result = unsafe { String::from_utf8_unchecked(result) };
+            response_body.clear();
             response_body.push_str(&result);
             *headers.get_mut("Content-Length").unwrap() = response_body.len().to_string();
         }
